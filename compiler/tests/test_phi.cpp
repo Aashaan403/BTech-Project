@@ -3,6 +3,7 @@
 #include <random>
 #include "ssarv/phielim.hpp"
 #include "support/fixtures.hpp"
+#include "support/phi_reachability.hpp"
 using namespace ssarv;
 TEST(Phi, ParallelCopiesPreserveOldSourcesIncludingCycles) {
     std::mt19937 random(411);
@@ -15,7 +16,9 @@ TEST(Phi, ParallelCopiesPreserveOldSourcesIncludingCycles) {
     }
 }
 TEST(Phi, DiamondCopiesAreTypedAndTransformationIsIdempotent) {
-    auto fn = fixtures::diamond(); auto report = eliminatePhis(fn);
+    auto fn = fixtures::diamond();
+    fixtures::AllReachableFixture reachability(fn);
+    auto report = eliminatePhis(fn);
     EXPECT_EQ(report.phis, 1); EXPECT_EQ(report.criticalEdgesSplit, 0);
     EXPECT_EQ(report.copies, 2);
     for (const auto& b : fn.blocks) for (const auto& i : b.instrs) {
@@ -34,6 +37,7 @@ TEST(Phi, CriticalSwitchEdgeRetargetsCasesAndPhiPredecessor) {
     Instr phi; phi.opcode = "phi"; phi.type = "i32"; phi.dst = p;
     phi.phiArgs = {{x,"",0,"%entry"},{kNoValue,"9",1,"%other"}}; phi.uses = {x};
     fn.blocks[2].instrs = {phi, fixtures::ret(fn,p)};
+    fixtures::AllReachableFixture reachability(fn);
     EXPECT_EQ(splitCriticalEdges(fn), 1); ASSERT_EQ(fn.blocks.size(), 4u);
     auto split = fn.blocks[0].instrs.back().cases[0].target; EXPECT_EQ(split, 3u);
     EXPECT_EQ(fn.blocks[2].instrs[0].phiArgs[0].pred, split);

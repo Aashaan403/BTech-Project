@@ -95,7 +95,8 @@ analysis fixtures; production uses Group 1 analysis.
 Owned files: `src/phielim.cpp`, `src/lowering.cpp`. Memory operations, calls,
 spill slots, stack frames, globals, register mapping, and support validation
 are implemented by Group 4 in `backend.cpp` and `driver.cpp`.
-The standalone lowering tests supply a recording context.
+Standalone phi tests supply declared reachability; lowering tests supply
+a recording context. Production phi handling can use Group 1 traversal.
 
 | Function | Required behaviour |
 |---|---|

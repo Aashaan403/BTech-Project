@@ -4,9 +4,9 @@
 // Virtual registers are dense ids, so adjacency is stored as bitsets.
 #pragma once
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
-#include "ssarv/todo.hpp"
 #include <vector>
 
 #include "ssarv/ir.hpp"
@@ -36,7 +36,15 @@ public:
     bool isSubsetOf(const BitSet& o) const;
 
     template <class F>
-    void forEach(F&&) const { unimplemented("BitSet::forEach"); }
+    void forEach(F&& visit) const {
+        for (std::size_t i = 0; i < w_.size(); ++i) {
+            auto word = w_[i];
+            while (word != 0) {
+                visit(static_cast<ValueId>(i * 64 + std::countr_zero(word)));
+                word &= word - 1;
+            }
+        }
+    }
 
     std::vector<ValueId> toVector() const;
 

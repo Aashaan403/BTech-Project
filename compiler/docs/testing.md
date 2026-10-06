@@ -8,7 +8,7 @@ Configure and build as shown in the README. GoogleTest is required for tests;
 | `utilities-tests` | Group 4 shared utilities | `SSARV_TEST_UTILITIES` |
 | `analysis-tests` | Group 1 + shared utilities | `SSARV_TEST_ANALYSIS` |
 | `allocators-tests` | Group 2 + fixture provider + utilities | `SSARV_TEST_ALLOCATORS` |
-| `phi-tests` | Group 3 phi + utilities | `SSARV_TEST_PHI` |
+| `phi-tests` | Group 3 phi + declared reachability + utilities | `SSARV_TEST_PHI` |
 | `lowering-tests` | Group 3 lowering + recording context | `SSARV_TEST_LOWERING` |
 | `lead-tests` | Group 4 parser/chordality/verifier + utilities | `SSARV_TEST_LEAD` |
 | `integration-tests` | All production components | `SSARV_TEST_INTEGRATION` |
@@ -29,6 +29,7 @@ ctest --test-dir build -L group2 --output-on-failure
 
 Group 3 enables `SSARV_TEST_PHI` and `SSARV_TEST_LOWERING`. Enable both checks
 before considering the group complete. Enable every switch for final acceptance.
+Utility checks are enabled by default after milestone 2.
 Default green checks cover only the current completed milestone; disabled
 checks are pending work. Do not report them as passed.
 
@@ -41,7 +42,12 @@ Unknown functions throw; no CFG traversal, dominator or liveness algorithm is
 implemented there. Never link this provider into the compiler or integration
 checks. New allocator fixtures require manually specified analysis results.
 
-Phi fixtures specify resolved CFG IDs and links explicitly. Lowering tests
+Phi fixtures specify resolved CFG IDs and links explicitly.
+`phi_reachability.cpp` returns dense block IDs only for functions registered
+with `AllReachableFixture`: these controlled examples declare every block
+reachable, including new critical-edge blocks. Unknown functions throw.
+This is a test assumption, not a reachability implementation; do not use it
+for fixtures with unreachable blocks or link it into production. Lowering tests
 record operand requests, emitted text and result commits; they do not execute
 RISC-V. Integration must add execution checks to validate arithmetic widths,
 signedness, calls, spills and aliasing on a real assembler/emulator.

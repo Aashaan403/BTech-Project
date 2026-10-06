@@ -11,6 +11,7 @@ No compiler execution is claimed at this milestone.
 
 Group 4 implements `ir_support.cpp`, `bitset.cpp`, `graph.cpp` and
 `alloc_result.cpp`, and BitSet iteration. Enable utility acceptance checks.
+Status: shared utilities complete; scaffold and utility checks enabled.
 Groups 1–3 can now run their isolated tests without a parser, advanced
 allocator or real backend. Their TODO functions still fail acceptance.
 

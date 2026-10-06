@@ -9,6 +9,10 @@ Read [interfaces](docs/interfaces.md), [milestones](docs/milestones.md),
 All four groups begin with implementation stubs. The executable builds but
 reports a TODO until orchestration and compiler components are implemented.
 
+Current milestone: shared utilities are implemented and their checks are enabled.
+Analysis, allocators, phi elimination, lowering and the remaining lead components
+are still TODOs.
+
 ## Build
 
 Requires CMake >= 3.24, a C++23 compiler/library with `<expected>`, and
