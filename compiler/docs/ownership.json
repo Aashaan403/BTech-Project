@@ -1,0 +1,7 @@
+{
+  "group1": ["src/analysis.cpp", "tests/test_analysis.cpp"],
+  "group2": ["src/allocators.cpp", "tests/test_allocators.cpp"],
+  "group3": ["src/phielim.cpp", "src/lowering.cpp", "tests/test_phi.cpp", "tests/test_lowering.cpp"],
+  "group4": ["src/ir_support.cpp", "src/bitset.cpp", "src/graph.cpp", "src/alloc_result.cpp", "src/parser.cpp", "src/chordality.cpp", "src/advanced_allocators.cpp", "src/ilp.cpp", "src/coalesce.cpp", "src/verify.cpp", "src/backend.cpp", "src/driver.cpp", "src/main.cpp", "tests/test_utilities.cpp", "tests/test_lead.cpp", "tests/test_integration.cpp"],
+  "coordinated": ["include/", "CMakeLists.txt", "tests/support/", "docs/", "scripts/"]
+}
