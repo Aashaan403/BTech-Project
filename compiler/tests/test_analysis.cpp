@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 #include <algorithm>
 #include "support/fixtures.hpp"
 
@@ -268,3 +268,52 @@ TEST(Analysis, ManuallyVerifiedInterferenceEdgesAndMaxLive) {
     EXPECT_EQ(inf.graph.numEdges(), 3u);
     EXPECT_EQ(inf.maxlive, 2u);
 }
+
+TEST(Analysis, EmptyFunctionWithParametersPreservesCapacityAndVregs) {
+    Function fn;
+    auto p0 = fn.values.intern("%p0");
+    auto p1 = fn.values.intern("%p1");
+    fn.params = {p0, p1};
+
+    EXPECT_TRUE(reachableBlocks(fn).empty());
+    EXPECT_TRUE(reversePostorder(fn).empty());
+    EXPECT_TRUE(dominators(fn).empty());
+    EXPECT_TRUE(loopDepths(fn).empty());
+    EXPECT_TRUE(computeLiveness(fn).liveIn.empty());
+
+    auto inf = interferenceGraph(fn);
+    EXPECT_EQ(inf.maxlive, 0u);
+    EXPECT_EQ(inf.graph.capacity(), fn.numValues());
+    EXPECT_EQ(inf.graph.numNodes(), 2u);
+    EXPECT_TRUE(inf.graph.contains(p0));
+    EXPECT_TRUE(inf.graph.contains(p1));
+    EXPECT_EQ(inf.graph.nodes(), fn.vregs());
+    EXPECT_EQ(inf.graph.numEdges(), 0u);
+}
+
+TEST(Analysis, DeepCFGLargeGraphNoStackOverflow) {
+    Function fn;
+    fn.name = "deep_cfg";
+    const std::size_t N = 50000;
+    fn.blocks.resize(N);
+    for (std::size_t i = 0; i < N; ++i) {
+        fn.blocks[i].id = static_cast<BlockId>(i);
+        if (i + 1 < N) {
+            fn.blocks[i].succs = {static_cast<BlockId>(i + 1)};
+        }
+        if (i > 0) {
+            fn.blocks[i].preds = {static_cast<BlockId>(i - 1)};
+        }
+    }
+
+    auto reach = reachableBlocks(fn);
+    EXPECT_EQ(reach.size(), N);
+    EXPECT_EQ(reach.front(), 0u);
+    EXPECT_EQ(reach.back(), N - 1);
+
+    auto rpo = reversePostorder(fn);
+    EXPECT_EQ(rpo.size(), N);
+    EXPECT_EQ(rpo.front(), 0u);
+    EXPECT_EQ(rpo.back(), N - 1);
+}
+

@@ -55,7 +55,7 @@ if(BUILD_TESTING)
 
     contract_target(analysis-tests tests/test_analysis.cpp)
     target_link_libraries(analysis-tests PRIVATE ssarv_analysis)
-    contract_check(contract.analysis analysis-tests SSARV_TEST_ANALYSIS "group1")
+    contract_check(contract.analysis analysis-tests SSARV_TEST_ANALYSIS "group1" ON)
 
     contract_target(allocators-tests tests/test_allocators.cpp tests/support/analysis_provider.cpp)
     target_link_libraries(allocators-tests PRIVATE ssarv_allocators)

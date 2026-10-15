@@ -1,4 +1,4 @@
-﻿#include "ssarv/analysis.hpp"
+#include "ssarv/analysis.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -10,40 +10,79 @@ namespace ssarv {
 std::vector<BlockId> reachableBlocks(const Function& fn) {
     if (fn.blocks.empty()) return {};
 
+    BlockId entry = fn.entry();
+    if (entry == kNoBlock || entry >= fn.blocks.size()) return {};
+
     std::vector<BlockId> reachable;
+    reachable.reserve(fn.blocks.size());
     std::vector<bool> visited(fn.blocks.size(), false);
 
-    auto dfs = [&](auto& self, BlockId b) -> void {
-        visited[b] = true;
-        reachable.push_back(b);
-        for (BlockId s : fn.blocks[b].succs) {
-            if (s < fn.blocks.size() && !visited[s]) {
-                self(self, s);
-            }
-        }
+    struct Frame {
+        BlockId b;
+        std::size_t nextSucc;
     };
 
-    dfs(dfs, fn.entry());
+    std::vector<Frame> stack;
+    stack.reserve(fn.blocks.size());
+
+    visited[entry] = true;
+    reachable.push_back(entry);
+    stack.push_back({entry, 0});
+
+    while (!stack.empty()) {
+        auto& [b, nextSucc] = stack.back();
+        const auto& succs = fn.blocks[b].succs;
+        if (nextSucc < succs.size()) {
+            BlockId s = succs[nextSucc++];
+            if (s < fn.blocks.size() && !visited[s]) {
+                visited[s] = true;
+                reachable.push_back(s);
+                stack.push_back({s, 0});
+            }
+        } else {
+            stack.pop_back();
+        }
+    }
+
     return reachable;
 }
 
 std::vector<BlockId> reversePostorder(const Function& fn) {
     if (fn.blocks.empty()) return {};
 
+    BlockId entry = fn.entry();
+    if (entry == kNoBlock || entry >= fn.blocks.size()) return {};
+
     std::vector<bool> visited(fn.blocks.size(), false);
     std::vector<BlockId> postorder;
+    postorder.reserve(fn.blocks.size());
 
-    auto dfs = [&](auto& self, BlockId b) -> void {
-        visited[b] = true;
-        for (BlockId s : fn.blocks[b].succs) {
-            if (s < fn.blocks.size() && !visited[s]) {
-                self(self, s);
-            }
-        }
-        postorder.push_back(b);
+    struct Frame {
+        BlockId b;
+        std::size_t nextSucc;
     };
 
-    dfs(dfs, fn.entry());
+    std::vector<Frame> stack;
+    stack.reserve(fn.blocks.size());
+
+    visited[entry] = true;
+    stack.push_back({entry, 0});
+
+    while (!stack.empty()) {
+        auto& [b, nextSucc] = stack.back();
+        const auto& succs = fn.blocks[b].succs;
+        if (nextSucc < succs.size()) {
+            BlockId s = succs[nextSucc++];
+            if (s < fn.blocks.size() && !visited[s]) {
+                visited[s] = true;
+                stack.push_back({s, 0});
+            }
+        } else {
+            postorder.push_back(b);
+            stack.pop_back();
+        }
+    }
+
     std::reverse(postorder.begin(), postorder.end());
     return postorder;
 }
@@ -263,16 +302,16 @@ Liveness computeLiveness(const Function& fn) {
 }
 
 Interference interferenceGraph(const Function& fn) {
-    if (fn.blocks.empty()) {
-        return { Graph(0), 0 };
-    }
-
     const std::size_t numValues = fn.numValues();
     Graph g(numValues);
     g.setPool(&fn.values);
 
     for (ValueId v : fn.vregs()) {
         g.addNode(v);
+    }
+
+    if (fn.blocks.empty()) {
+        return { g, 0 };
     }
 
     Liveness lv = computeLiveness(fn);
