@@ -1,4 +1,10 @@
 #include <gtest/gtest.h>
+#include <initializer_list>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 #include "support/recording_context.hpp"
 using namespace ssarv;
 TEST(Lowering, BinaryCommitsThroughContextAndUsesReservedScratch) {
@@ -36,4 +42,78 @@ TEST(Lowering, BranchAndReturnUseContextLabels) {
     Instr ret; ret.opcode = "ret"; ret.type = "i32"; ret.operands = {{0,"%x"}};
     lowerTerminator(ret,ctx); EXPECT_NE(ctx.text().find(".Lepilogue"), std::string::npos);
     EXPECT_TRUE(ctx.commits.empty());
+}
+TEST(Lowering, IntegerArithmeticCoversBitwiseShiftsAndDivision) {
+    for (const char* opcode : {"add", "sub", "mul", "and", "or", "xor",
+                               "shl", "lshr", "ashr", "sdiv", "udiv", "srem", "urem"}) {
+        fixtures::RecordingContext ctx;
+        // Destination deliberately aliases the second source. Multi-step
+        // unsigned/signed lowering must preserve that source first.
+        ctx.registers = {{0, "a0"}, {1, "a1"}, {2, "a1"}};
+        Instr in; in.opcode = opcode; in.type = "i33"; in.dst = 2;
+        in.uses = {0, 1}; in.operands = {{0, "%x"}, {1, "%y"}};
+        lowerBinary(in, ctx);
+        ASSERT_EQ(ctx.commits, (std::vector<std::pair<ValueId, std::string>>{{2, "a1"}}));
+        EXPECT_FALSE(ctx.lines.empty()) << opcode;
+        EXPECT_NE(ctx.text().find("slli a1, a1, 31"), std::string::npos) << opcode;
+    }
+}
+TEST(Lowering, AllIntegerComparisonPredicatesYieldCommittedI1) {
+    for (const char* predicate : {"eq", "ne", "slt", "sle", "sgt", "sge",
+                                  "ult", "ule", "ugt", "uge"}) {
+        fixtures::RecordingContext ctx;
+        ctx.registers = {{0, "a0"}, {1, "a1"}, {2, "a1"}};
+        Instr in; in.opcode = "icmp"; in.subop = predicate; in.type = "i8"; in.dst = 2;
+        in.operands = {{0, "%x"}, {1, "%y"}};
+        lowerCompare(in, ctx);
+        ASSERT_EQ(ctx.commits.size(), 1u);
+        EXPECT_EQ(ctx.commits[0].second, "a1");
+        EXPECT_NE(ctx.text().find("andi a1, a1, 1"), std::string::npos);
+    }
+}
+TEST(Lowering, CastsHandleSignZeroTruncationAndNoopBitcast) {
+    for (const auto& [opcode, source, target] :
+         std::initializer_list<std::tuple<const char*, const char*, const char*>>{
+             {"trunc", "i64", "i1"}, {"zext", "i1", "i33"},
+             {"sext", "i1", "i64"}, {"bitcast", "i32", "i32"}}) {
+        fixtures::RecordingContext ctx; ctx.registers = {{0, "a0"}, {1, "a1"}};
+        Instr in; in.opcode = opcode; in.type = source; in.dst = 1;
+        in.operands = {{0, "%x"}};
+        in.text = std::string(opcode) + " " + source + " %x to " + target;
+        lowerCast(in, ctx);
+        EXPECT_EQ(ctx.commits.size(), 1u) << opcode;
+        EXPECT_FALSE(ctx.lines.empty()) << opcode;
+    }
+}
+TEST(Lowering, ConditionalSwitchAndUnreachableTerminatorsEmitValidControlFlow) {
+    fixtures::RecordingContext ctx; ctx.registers = {{0, "a0"}};
+    Instr branch; branch.opcode = "br"; branch.succs = {1, 2};
+    branch.operands = {{0, "%condition"}};
+    lowerTerminator(branch, ctx);
+    EXPECT_NE(ctx.text().find("bnez a0, .Lblock1"), std::string::npos);
+    EXPECT_NE(ctx.text().find("j .Lblock2"), std::string::npos);
+
+    Instr sw; sw.opcode = "switch"; sw.type = "i8"; sw.succs = {3, 4};
+    sw.operands = {{0, "%value"}}; sw.cases = {{"255", 4, "%case"}};
+    lowerTerminator(sw, ctx);
+    EXPECT_NE(ctx.text().find("beq a0, t6, .Lblock4"), std::string::npos);
+    EXPECT_NE(ctx.text().find("j .Lblock3"), std::string::npos);
+
+    Instr unreachable; unreachable.opcode = "unreachable";
+    lowerTerminator(unreachable, ctx);
+    EXPECT_NE(ctx.text().find("ebreak"), std::string::npos);
+}
+TEST(Lowering, SelectUsesControlFlowForSpilledInputsAndUnsupportedOpsDiagnose) {
+    fixtures::RecordingContext ctx;
+    Instr select; select.opcode = "select"; select.type = "i8"; select.dst = 3;
+    select.operands = {{kNoValue, "1"}, {kNoValue, "255"}, {kNoValue, "2"}};
+    lowerSelect(select, ctx);
+    EXPECT_NE(ctx.text().find("select.false"), std::string::npos);
+    EXPECT_NE(ctx.text().find("select.end"), std::string::npos);
+    ASSERT_EQ(ctx.commits.size(), 1u);
+    EXPECT_EQ(ctx.commits[0].second, "t5");
+
+    Instr bad; bad.opcode = "fadd"; bad.type = "i32"; bad.dst = 0;
+    bad.operands = {{kNoValue, "1"}, {kNoValue, "2"}};
+    EXPECT_THROW(lowerBinary(bad, ctx), std::invalid_argument);
 }
